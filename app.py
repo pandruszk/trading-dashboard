@@ -20,8 +20,11 @@ import os
 import json
 import re
 import glob
+import secrets
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify
+from functools import wraps
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
 
 import alpaca_trade_api as tradeapi
 import yfinance as yf
@@ -43,6 +46,20 @@ MAX_PER_SECTOR = 3
 INITIAL_CAPITAL = 100000  # Alpaca paper account starting equity
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+
+DASHBOARD_PASSWORD_HASH = generate_password_hash("M0n3yM@ch1n3")
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("authenticated"):
+            if request.path.startswith("/api/"):
+                return jsonify({"error": "unauthorized"}), 401
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
 
 # ============================================================
 # HELPERS
@@ -125,12 +142,33 @@ def get_cached_sectors(tickers):
 # ============================================================
 # ROUTES
 # ============================================================
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("authenticated"):
+        return redirect(url_for("index"))
+    error = None
+    if request.method == "POST":
+        if check_password_hash(DASHBOARD_PASSWORD_HASH, request.form.get("password", "")):
+            session["authenticated"] = True
+            return redirect(url_for("index"))
+        error = "Wrong password"
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/")
+@login_required
 def index():
     return render_template("index.html")
 
 
 @app.route("/api/account")
+@login_required
 def api_account():
     try:
         api = get_api()
@@ -161,6 +199,7 @@ def api_account():
 
 
 @app.route("/api/positions")
+@login_required
 def api_positions():
     try:
         api = get_api()
@@ -235,6 +274,7 @@ def api_positions():
 
 
 @app.route("/api/trades")
+@login_required
 def api_trades():
     try:
         state = load_state()
@@ -259,6 +299,7 @@ def api_trades():
 
 
 @app.route("/api/risk")
+@login_required
 def api_risk():
     try:
         api = get_api()
@@ -383,6 +424,7 @@ def api_risk():
 
 
 @app.route("/api/history")
+@login_required
 def api_history():
     """Parse equity values from autopilot log files."""
     try:
@@ -457,6 +499,7 @@ def api_history():
 
 
 @app.route("/api/status")
+@login_required
 def api_status():
     try:
         api = get_api()

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Dashboard — Login</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .login-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .login-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            width: 100%;
+            max-width: 360px;
+        }
+        .login-box h1 {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+        .login-box p {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-bottom: 24px;
+        }
+        .login-box label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .login-box input[type="password"] {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            margin-bottom: 16px;
+        }
+        .login-box input[type="password"]:focus {
+            border-color: var(--blue);
+        }
+        .login-box button {
+            width: 100%;
+            padding: 10px;
+            background: var(--blue);
+            color: var(--bg-primary);
+            border: none;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        .login-box button:hover {
+            opacity: 0.9;
+        }
+        .login-error {
+            background: var(--red-dim);
+            color: var(--red);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="login-box">
+            <h1>Trading Dashboard</h1>
+            <p>Enter password to continue</p>
+            {% if error %}
+            <div class="login-error">{{ error }}</div>
+            {% endif %}
+            <form method="POST">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" autofocus>
+                <button type="submit">Log In</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
