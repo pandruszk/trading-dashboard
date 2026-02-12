@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- ========== HEADER BAR ========== -->
+    <div class="header">
+        <div class="header-title">
+            <h1>Trading Dashboard</h1>
+            <span id="market-badge" class="market-badge closed">Loading...</span>
+        </div>
+        <div class="header-stats">
+            <div class="stat">
+                <div class="stat-label">Portfolio Value</div>
+                <div id="equity-value" class="stat-value large">—</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Total P&L</div>
+                <div id="total-pl" class="stat-value">—</div>
+                <div id="total-pl-pct" class="stat-sub">—</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Today's P&L</div>
+                <div id="today-pl" class="stat-value">—</div>
+                <div id="today-pl-pct" class="stat-sub">—</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Cash</div>
+                <div id="cash-value" class="stat-value">—</div>
+            </div>
+            <div class="stat">
+                <div class="refresh-info">
+                    <span class="refresh-dot"></span>
+                    <span id="refresh-info">Auto-refresh: 5m</span>
+                    <span>&middot;</span>
+                    <span id="last-updated">—</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== HOLDINGS TABLE ========== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Holdings</span>
+            <span id="holdings-count" class="card-badge">—</span>
+        </div>
+        <div class="scrollable">
+            <table id="holdings-table">
+                <thead>
+                    <tr>
+                        <th data-col="ticker" onclick="sortHoldings('ticker')">Ticker</th>
+                        <th data-col="sector" onclick="sortHoldings('sector')">Sector</th>
+                        <th data-col="shares" class="right" onclick="sortHoldings('shares')">Shares</th>
+                        <th data-col="entry_price" class="right" onclick="sortHoldings('entry_price')">Entry</th>
+                        <th data-col="current_price" class="right" onclick="sortHoldings('current_price')">Current</th>
+                        <th data-col="market_value" class="right sort-desc" onclick="sortHoldings('market_value')">Mkt Value</th>
+                        <th data-col="weight" class="right" onclick="sortHoldings('weight')">Weight</th>
+                        <th data-col="pnl" class="right" onclick="sortHoldings('pnl')">P&L ($)</th>
+                        <th data-col="pnl_pct" class="right" onclick="sortHoldings('pnl_pct')">P&L (%)</th>
+                        <th data-col="effective_stop" class="right" onclick="sortHoldings('effective_stop')">Stop (Dist)</th>
+                    </tr>
+                </thead>
+                <tbody id="holdings-body">
+                    <tr><td colspan="10" class="loading"><span class="loading-spinner"></span>Loading positions...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ========== CHARTS ROW ========== -->
+    <div class="grid-3">
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Portfolio Value</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-portfolio"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Sector Allocation</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-sectors"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Position P&L</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-pnl"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== RISK DASHBOARD ========== -->
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Stop-Loss Status</span>
+            </div>
+            <div id="stop-bars">
+                <div class="loading"><span class="loading-spinner"></span>Loading...</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Sector Concentration</span>
+            </div>
+            <div id="sector-bars">
+                <div class="loading"><span class="loading-spinner"></span>Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== ALERTS ========== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Alerts</span>
+            <span id="alert-count" class="card-badge">0</span>
+        </div>
+        <div id="alerts-panel">
+            <div class="loading"><span class="loading-spinner"></span>Loading...</div>
+        </div>
+    </div>
+
+    <!-- ========== TRADE HISTORY ========== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Trade History</span>
+            <span id="trades-count" class="card-badge">—</span>
+        </div>
+        <div class="filter-bar">
+            <button class="filter-btn active" data-action="ALL" onclick="filterTrades('ALL')">All</button>
+            <button class="filter-btn" data-action="BUY" onclick="filterTrades('BUY')">Buy</button>
+            <button class="filter-btn" data-action="SELL" onclick="filterTrades('SELL')">Sell</button>
+            <button class="filter-btn" data-action="TRIM" onclick="filterTrades('TRIM')">Trim</button>
+        </div>
+        <div class="scrollable">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Action</th>
+                        <th>Ticker</th>
+                        <th class="right">Shares</th>
+                        <th class="right">Price</th>
+                        <th class="right">Value</th>
+                        <th>Reason</th>
+                    </tr>
+                </thead>
+                <tbody id="trades-body">
+                    <tr><td colspan="7" class="loading"><span class="loading-spinner"></span>Loading trades...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ========== SYSTEM STATUS ========== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">System Status</span>
+        </div>
+        <div class="status-grid">
+            <div class="status-item">
+                <span class="status-label">Last Daily Check</span>
+                <span id="status-last-daily" class="status-value">—</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Last Monthly Rebalance</span>
+                <span id="status-last-monthly" class="status-value">—</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Last Rebalance</span>
+                <span id="status-last-rebalance" class="status-value">—</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Next Rebalance</span>
+                <span id="status-next-rebalance" class="status-value">—</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Days Since Rebalance</span>
+                <span id="status-days-since" class="status-value">—</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Stop Orders</span>
+                <span id="status-stops" class="status-value">—</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Positions</span>
+                <span id="status-positions" class="status-value">—</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Latest Log</span>
+                <span id="status-latest-log" class="status-value">—</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Portfolio Created</span>
+                <span id="status-created" class="status-value">—</span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script src="/static/dashboard.js"></script>
+
+</body>
+</html>
