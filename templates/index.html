@@ -76,6 +76,40 @@
         </div>
     </div>
 
+    <!-- ========== KELL CYCLE ========== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Kell Cycle</span>
+            <span class="card-badge" title="Oliver Kell — Cycle of Price Action">Oliver Kell · 10/21 EMA · 50/200 SMA</span>
+        </div>
+        <div class="filter-bar">
+            <input id="kell-tickers" class="kell-input" type="text"
+                   placeholder="Watchlist tickers, e.g. NVDA AAPL PLTR — press Enter to analyze" />
+            <button class="filter-btn" onclick="loadKell()">Analyze</button>
+        </div>
+        <div class="scrollable">
+            <table id="kell-table">
+                <thead>
+                    <tr>
+                        <th>Ticker</th>
+                        <th>Phase</th>
+                        <th>Signal</th>
+                        <th class="right">Price</th>
+                        <th class="right">vs 10 EMA</th>
+                        <th class="right">vs 21 EMA</th>
+                        <th class="right">vs 50 SMA</th>
+                        <th class="right">RS 3M</th>
+                        <th class="right">Kell Stop</th>
+                        <th>Read</th>
+                    </tr>
+                </thead>
+                <tbody id="kell-body">
+                    <tr><td colspan="10" class="loading"><span class="loading-spinner"></span>Loading Kell Cycle…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- ========== CHARTS ROW ========== -->
     <div class="grid-3">
         <div class="card">

@@ -13,6 +13,7 @@ let tradeFilter = "ALL";
 // INIT
 // ============================================================
 document.addEventListener("DOMContentLoaded", () => {
+    initKell();
     loadAll();
     startAutoRefresh();
 });
@@ -24,6 +25,7 @@ function loadAll() {
     fetchRisk();
     fetchHistory();
     fetchStatus();
+    fetchKell();
 }
 
 function startAutoRefresh() {
@@ -572,4 +574,74 @@ async function fetchStatus() {
     } catch (e) {
         console.error("Status fetch error:", e);
     }
+}
+
+// ============================================================
+// KELL CYCLE  (Oliver Kell — Cycle of Price Action)
+// ============================================================
+function kellWatchlist() {
+    const el = document.getElementById("kell-tickers");
+    return el ? el.value.trim() : "";
+}
+
+// Restore the saved watchlist and wire the Enter key
+function initKell() {
+    const el = document.getElementById("kell-tickers");
+    if (!el) return;
+    try { el.value = localStorage.getItem("kellWatchlist") || ""; } catch (e) {}
+    el.addEventListener("keydown", ev => { if (ev.key === "Enter") loadKell(); });
+}
+
+// Called by the Analyze button / Enter — persists the watchlist, then fetches
+function loadKell() {
+    try { localStorage.setItem("kellWatchlist", kellWatchlist()); } catch (e) {}
+    fetchKell();
+}
+
+async function fetchKell() {
+    const tbody = document.getElementById("kell-body");
+    try {
+        const wl = kellWatchlist();
+        const url = "/api/kell" + (wl ? "?tickers=" + encodeURIComponent(wl) : "");
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        renderKell(data.results || []);
+    } catch (e) {
+        console.error("Kell fetch error:", e);
+        if (tbody) tbody.innerHTML =
+            '<tr><td colspan="10" class="error-msg">Failed to load Kell Cycle</td></tr>';
+    }
+}
+
+function renderKell(results) {
+    const tbody = document.getElementById("kell-body");
+    if (!tbody) return;
+
+    if (!results.length) {
+        tbody.innerHTML =
+            '<tr><td colspan="10" class="loading">No positions yet — add watchlist tickers above to analyze them through Kell\'s lens.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = results.map(r => {
+        const st = r.status || "gray";
+        const stop = r.suggested_stop != null
+            ? `${fmt$(r.suggested_stop)} <span style="color:var(--text-muted)">(${fmtPct(r.dist_to_stop)})</span>`
+            : "—";
+        return `
+            <tr>
+                <td class="ticker">${r.ticker || "—"}</td>
+                <td><span class="kell-badge ${st}">${r.phase || "—"}</span></td>
+                <td class="kell-sig ${st}">${r.signal || "—"}</td>
+                <td class="right">${fmt$(r.price)}</td>
+                <td class="right">${fmtPct(r.ext_10ema)}</td>
+                <td class="right">${fmtPct(r.ext_21ema)}</td>
+                <td class="right">${fmtPct(r.ext_50sma)}</td>
+                <td class="right ${plClass(r.rs_3m_vs_spy)}">${fmtPct(r.rs_3m_vs_spy)}</td>
+                <td class="right">${stop}</td>
+                <td class="kell-note">${r.note || ""}</td>
+            </tr>
+        `;
+    }).join("");
 }

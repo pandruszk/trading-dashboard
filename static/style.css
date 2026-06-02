@@ -509,6 +509,55 @@ tbody tr:last-child td {
     color: var(--yellow);
 }
 
+/* ---- Kell Cycle ---- */
+.kell-input {
+    flex: 1;
+    min-width: 240px;
+    font-family: inherit;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.kell-input:focus {
+    outline: none;
+    border-color: var(--blue);
+}
+
+.kell-input::placeholder {
+    color: var(--text-muted);
+}
+
+.kell-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.kell-badge.green  { background: var(--green-dim);  color: var(--green); }
+.kell-badge.yellow { background: var(--yellow-dim); color: var(--yellow); }
+.kell-badge.red    { background: var(--red-dim);    color: var(--red); }
+.kell-badge.gray   { background: var(--bg-hover);   color: var(--text-muted); }
+
+.kell-sig { font-weight: 700; }
+.kell-sig.green  { color: var(--green); }
+.kell-sig.yellow { color: var(--yellow); }
+.kell-sig.red    { color: var(--red); }
+.kell-sig.gray   { color: var(--text-muted); }
+
+.kell-note {
+    white-space: normal;
+    color: var(--text-muted);
+    font-size: 11px;
+    max-width: 280px;
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 1024px) {
     .grid-3 {
