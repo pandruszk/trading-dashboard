@@ -29,6 +29,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import alpaca_trade_api as tradeapi
 import yfinance as yf
 
+import kell
+
 # ============================================================
 # CONFIG
 # ============================================================
@@ -549,6 +551,44 @@ def api_status():
             "stops_coverage": f"{stop_count}/{len(positions)}",
             "latest_log": latest_log,
             "portfolio_created": state.get("created") if state else None,
+            "timestamp": datetime.now().isoformat(),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/kell")
+@login_required
+def api_kell():
+    """Kell Cycle analysis for current holdings plus any ?tickers= watchlist.
+
+    Implements Oliver Kell's "Cycle of Price Action": classifies each name's
+    phase (reversal / crossback / base & break / uptrend / exhaustion / wedge
+    drop) from its 10-21 EMA and 50-200 SMA structure and emits a Kell-style
+    buy / hold / trim / exit signal. See kell.py and KELL.md.
+    """
+    try:
+        tickers = []
+        try:
+            api = get_api()
+            tickers = [p.symbol for p in api.list_positions()]
+        except Exception:
+            tickers = []
+
+        # Optional watchlist passed from the dashboard, e.g. ?tickers=NVDA,AAPL
+        extra = request.args.get("tickers", "")
+        if extra:
+            tickers += [t for t in re.split(r"[,\s]+", extra) if t]
+
+        results = kell.analyze_tickers(tickers)
+        return jsonify({
+            "results": results,
+            "params": {
+                "ema_fast": kell.EMA_FAST,
+                "ema_slow": kell.EMA_SLOW,
+                "sma_trend": kell.SMA_TREND,
+                "sma_long": kell.SMA_LONG,
+            },
             "timestamp": datetime.now().isoformat(),
         })
     except Exception as e:
