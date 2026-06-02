@@ -48,7 +48,7 @@ INITIAL_CAPITAL = 100000  # Alpaca paper account starting equity
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 
-DASHBOARD_PASSWORD_HASH = generate_password_hash("M0n3yM@ch1n3")
+DASHBOARD_PASSWORD_HASH = generate_password_hash("M0n3yM@ch1n3", method="pbkdf2")
 
 
 def login_required(f):
