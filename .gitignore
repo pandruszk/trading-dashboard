@@ -12,5 +12,9 @@ env/
 .env
 .alpaca_keys
 
+# Generated scan caches
+kell_scan.json
+universe_cache.json
+
 # OS cruft
 .DS_Store

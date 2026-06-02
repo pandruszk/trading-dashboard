@@ -30,6 +30,7 @@ import alpaca_trade_api as tradeapi
 import yfinance as yf
 
 import kell
+import kell_scan
 
 # ============================================================
 # CONFIG
@@ -593,6 +594,24 @@ def api_kell():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/kell/scan")
+@login_required
+def api_kell_scan():
+    """Return the latest cached full-market Kell screen + live scan status."""
+    data = kell_scan.load_scan() or {"results": [], "scanned": 0, "universe": 0,
+                                      "generated": None}
+    data["status"] = kell_scan.scan_status()
+    return jsonify(data)
+
+
+@app.route("/api/kell/scan/run", methods=["POST"])
+@login_required
+def api_kell_scan_run():
+    """Kick off a background full-market scan (optional ?max=N to cap the universe)."""
+    max_tickers = request.args.get("max", type=int)
+    return jsonify(kell_scan.start_scan_async(max_tickers))
 
 
 # ============================================================

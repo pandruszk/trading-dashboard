@@ -26,6 +26,7 @@ function loadAll() {
     fetchHistory();
     fetchStatus();
     fetchKell();
+    fetchKellScan();
 }
 
 function startAutoRefresh() {
@@ -639,6 +640,100 @@ function renderKell(results) {
                 <td class="right">${fmtPct(r.ext_21ema)}</td>
                 <td class="right">${fmtPct(r.ext_50sma)}</td>
                 <td class="right ${plClass(r.rs_3m_vs_spy)}">${fmtPct(r.rs_3m_vs_spy)}</td>
+                <td class="right">${stop}</td>
+                <td class="kell-note">${r.note || ""}</td>
+            </tr>
+        `;
+    }).join("");
+}
+
+// ============================================================
+// KELL SCREENER  (whole-market scan)
+// ============================================================
+let kellScanTimer = null;
+
+function fmtBig$(v) {
+    if (v == null || isNaN(v)) return "—";
+    if (v >= 1e9) return "$" + (v / 1e9).toFixed(1) + "B";
+    if (v >= 1e6) return "$" + (v / 1e6).toFixed(1) + "M";
+    if (v >= 1e3) return "$" + (v / 1e3).toFixed(0) + "K";
+    return "$" + v.toFixed(0);
+}
+
+async function fetchKellScan() {
+    try {
+        const res = await fetch("/api/kell/scan");
+        const data = await res.json();
+        renderKellScan(data);
+        // Keep polling while a scan is running
+        if (data.status && data.status.state === "running") {
+            if (kellScanTimer) clearTimeout(kellScanTimer);
+            kellScanTimer = setTimeout(fetchKellScan, 4000);
+        }
+    } catch (e) {
+        console.error("Kell scan fetch error:", e);
+    }
+}
+
+async function runKellScan() {
+    const btn = document.getElementById("kell-scan-btn");
+    try {
+        if (btn) { btn.disabled = true; btn.textContent = "Scanning…"; }
+        await fetch("/api/kell/scan/run", { method: "POST" });
+    } catch (e) {
+        console.error("Kell scan start error:", e);
+    }
+    setTimeout(fetchKellScan, 800);
+}
+
+function renderKellScan(data) {
+    const status = data.status || { state: "idle" };
+    const results = data.results || [];
+    const btn = document.getElementById("kell-scan-btn");
+    const statusEl = document.getElementById("kell-scan-status");
+    const metaEl = document.getElementById("kell-scan-meta");
+    const tbody = document.getElementById("kell-scan-body");
+
+    const running = status.state === "running";
+    if (btn) {
+        btn.disabled = running;
+        btn.textContent = running ? "Scanning…" : "Rescan market";
+    }
+    if (statusEl) {
+        if (running) {
+            statusEl.innerHTML =
+                `<span class="loading-spinner"></span>Scanning ${status.scanned || 0}/${status.total || 0} — ${status.matches || 0} setups so far`;
+        } else if (status.state === "error") {
+            statusEl.textContent = "Scan error: " + (status.error || "unknown");
+        } else if (data.generated) {
+            statusEl.textContent = `Scanned ${data.scanned || 0} of ${data.universe || 0} names`;
+        } else {
+            statusEl.textContent = "No scan yet — click Rescan market (takes a few minutes).";
+        }
+    }
+    if (metaEl) metaEl.textContent = data.generated ? "as of " + fmtTime(data.generated) : "—";
+
+    if (!tbody) return;
+    if (!results.length) {
+        tbody.innerHTML = running
+            ? '<tr><td colspan="9" class="loading">Scanning the market…</td></tr>'
+            : '<tr><td colspan="9" class="loading">No buy setups in the last scan.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = results.map(r => {
+        const st = r.status || "green";
+        const stop = r.suggested_stop != null
+            ? `${fmt$(r.suggested_stop)} <span style="color:var(--text-muted)">(${fmtPct(r.dist_to_stop)})</span>`
+            : "—";
+        return `
+            <tr>
+                <td class="ticker">${r.ticker}</td>
+                <td><span class="kell-badge ${st}">${r.phase}</span></td>
+                <td class="kell-sig ${st}">${r.signal}</td>
+                <td class="right">${fmt$(r.price)}</td>
+                <td class="right">${fmtPct(r.ext_10ema)}</td>
+                <td class="right ${plClass(r.rs_3m_vs_spy)}">${fmtPct(r.rs_3m_vs_spy)}</td>
+                <td class="right">${fmtBig$(r.dollar_vol)}</td>
                 <td class="right">${stop}</td>
                 <td class="kell-note">${r.note || ""}</td>
             </tr>

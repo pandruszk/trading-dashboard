@@ -110,6 +110,38 @@
         </div>
     </div>
 
+    <!-- ========== KELL SCREENER ========== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Kell Screener — Whole Market</span>
+            <span id="kell-scan-meta" class="card-badge">—</span>
+        </div>
+        <div class="filter-bar">
+            <button id="kell-scan-btn" class="filter-btn" onclick="runKellScan()">Rescan market</button>
+            <span id="kell-scan-status" class="scan-status">Loading…</span>
+        </div>
+        <div class="scrollable">
+            <table id="kell-scan-table">
+                <thead>
+                    <tr>
+                        <th>Ticker</th>
+                        <th>Phase</th>
+                        <th>Signal</th>
+                        <th class="right">Price</th>
+                        <th class="right">vs 10 EMA</th>
+                        <th class="right">RS 3M</th>
+                        <th class="right">$ Vol</th>
+                        <th class="right">Kell Stop</th>
+                        <th>Read</th>
+                    </tr>
+                </thead>
+                <tbody id="kell-scan-body">
+                    <tr><td colspan="9" class="loading"><span class="loading-spinner"></span>Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- ========== CHARTS ROW ========== -->
     <div class="grid-3">
         <div class="card">
