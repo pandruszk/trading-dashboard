@@ -37,6 +37,7 @@ MIN_DOLLAR_VOL = 3_000_000      # 50-day avg of close * volume
 BUY_PHASES = ("EMA Crossback", "Base & Break")
 
 BATCH_SIZE = 150               # tickers per yfinance batch download
+MAX_RESULTS = 100              # top matches (by RS) to keep + enrich with company info
 
 # Used only if the symbol-list download is unavailable (offline / blocked)
 FALLBACK_UNIVERSE = [
@@ -61,6 +62,7 @@ FALLBACK_UNIVERSE = [
 # --- Background scan state --------------------------------------------------
 _scan_status = {
     "state": "idle",            # idle | running | done | error
+    "stage": None,              # scanning | enriching (while running)
     "scanned": 0,
     "total": 0,
     "matches": 0,
@@ -160,8 +162,9 @@ def run_scan(max_tickers=None, batch_size=BATCH_SIZE):
     with _scan_lock:
         if _scan_status["state"] == "running":
             return dict(_scan_status)
-        _scan_status.update(state="running", scanned=0, total=0, matches=0,
-                            started=datetime.now().isoformat(), finished=None, error=None)
+        _scan_status.update(state="running", stage="scanning", scanned=0, total=0,
+                            matches=0, started=datetime.now().isoformat(),
+                            finished=None, error=None)
 
     try:
         universe = get_universe()
@@ -204,6 +207,13 @@ def run_scan(max_tickers=None, batch_size=BATCH_SIZE):
             time.sleep(0.3)   # be polite to the data source between batches
 
         matches.sort(key=lambda r: r.get("rs_3m_vs_spy") or 0, reverse=True)
+        matches = matches[:MAX_RESULTS]
+
+        # Enrich the survivors with company name / sector / market cap / thesis
+        _scan_status["stage"] = "enriching"
+        for r in matches:
+            kell.enrich(r)
+
         payload = {
             "results": matches,
             "scanned": _scan_status["scanned"],

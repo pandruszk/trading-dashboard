@@ -615,6 +615,12 @@ async function fetchKell() {
     }
 }
 
+// Ticker cell with the company name underneath (shared by both Kell cards)
+function tickerCell(r) {
+    const name = r.name ? `<div class="co-name">${r.name}</div>` : "";
+    return `<td class="ticker">${r.ticker || "—"}${name}</td>`;
+}
+
 function renderKell(results) {
     const tbody = document.getElementById("kell-body");
     if (!tbody) return;
@@ -632,7 +638,7 @@ function renderKell(results) {
             : "—";
         return `
             <tr>
-                <td class="ticker">${r.ticker || "—"}</td>
+                ${tickerCell(r)}
                 <td><span class="kell-badge ${st}">${r.phase || "—"}</span></td>
                 <td class="kell-sig ${st}">${r.signal || "—"}</td>
                 <td class="right">${fmt$(r.price)}</td>
@@ -641,7 +647,7 @@ function renderKell(results) {
                 <td class="right">${fmtPct(r.ext_50sma)}</td>
                 <td class="right ${plClass(r.rs_3m_vs_spy)}">${fmtPct(r.rs_3m_vs_spy)}</td>
                 <td class="right">${stop}</td>
-                <td class="kell-note">${r.note || ""}</td>
+                <td class="kell-note">${r.thesis || r.note || ""}</td>
             </tr>
         `;
     }).join("");
@@ -700,7 +706,10 @@ function renderKellScan(data) {
         btn.textContent = running ? "Scanning…" : "Rescan market";
     }
     if (statusEl) {
-        if (running) {
+        if (running && status.stage === "enriching") {
+            statusEl.innerHTML =
+                `<span class="loading-spinner"></span>Adding company details to ${status.matches || 0} setups…`;
+        } else if (running) {
             statusEl.innerHTML =
                 `<span class="loading-spinner"></span>Scanning ${status.scanned || 0}/${status.total || 0} — ${status.matches || 0} setups so far`;
         } else if (status.state === "error") {
@@ -727,15 +736,15 @@ function renderKellScan(data) {
             : "—";
         return `
             <tr>
-                <td class="ticker">${r.ticker}</td>
+                ${tickerCell(r)}
+                <td>${r.sector || "—"}</td>
                 <td><span class="kell-badge ${st}">${r.phase}</span></td>
                 <td class="kell-sig ${st}">${r.signal}</td>
                 <td class="right">${fmt$(r.price)}</td>
-                <td class="right">${fmtPct(r.ext_10ema)}</td>
                 <td class="right ${plClass(r.rs_3m_vs_spy)}">${fmtPct(r.rs_3m_vs_spy)}</td>
                 <td class="right">${fmtBig$(r.dollar_vol)}</td>
                 <td class="right">${stop}</td>
-                <td class="kell-note">${r.note || ""}</td>
+                <td class="kell-note">${r.thesis || r.note || ""}</td>
             </tr>
         `;
     }).join("");
