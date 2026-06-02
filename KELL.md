@@ -78,6 +78,7 @@ strength vs SPY over ~3 months (`rs_3m_vs_spy`) to favor leaders.
 
 - **Endpoint:** `GET /api/kell` — analyzes your current Alpaca holdings, plus any `?tickers=NVDA,AAPL` watchlist. Results are cached 15 minutes and ordered most-actionable-first (exits/trims → buys → holds).
 - **Dashboard:** a **Kell Cycle** card with a saved watchlist box, showing each name's phase, signal, extension from the 10/21 EMA and 50 SMA, 3-month relative strength, and the 21-EMA stop.
+- **Context / thesis:** results are enriched (via `kell.enrich`) with the **company name**, **sector/industry**, **market-cap size**, and a one-line **thesis** that combines them with the Kell reason the name surfaced (e.g. *"Large-cap Technology name pulled back to its 10/21 EMA with the trend intact; +18% relative strength vs the market (3M)."*). Company metadata is cached 24h and, in the screener, fetched only for the filtered matches to keep the scan fast.
 
 ## 3b. Whole-market screener ([`kell_scan.py`](kell_scan.py))
 

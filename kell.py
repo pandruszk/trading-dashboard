@@ -169,6 +169,82 @@ def analyze_series(closes, volumes=None, bench_closes=None):
     }
 
 
+# --- company metadata + plain-English thesis -------------------------------
+_meta_cache = {}     # ticker -> (timestamp, meta dict)
+_META_TTL = 24 * 3600
+
+# Plain-English "why now" for each phase, used to build the thesis
+_WHY = {
+    "EMA Crossback": "pulled back to its 10/21 EMA with the trend intact",
+    "Base & Break": "basing near 52-week highs and breaking out",
+    "Uptrend (holding MAs)": "trending steadily above its moving averages",
+    "Exhaustion Extension": "stretched far above its 10 EMA — extended",
+    "Wedge Drop / Downtrend": "below its moving averages — trend broken",
+    "Reversal Extension": "deeply oversold below its moving averages",
+}
+
+
+def get_meta(ticker):
+    """Company name / sector / industry / market cap from yfinance (cached 24h)."""
+    now = datetime.now().timestamp()
+    hit = _meta_cache.get(ticker)
+    if hit and now - hit[0] < _META_TTL:
+        return hit[1]
+    meta = {"name": None, "sector": None, "industry": None, "market_cap": None}
+    try:
+        import yfinance as yf
+        info = yf.Ticker(ticker).info or {}
+        meta["name"] = info.get("shortName") or info.get("longName")
+        meta["sector"] = info.get("sector")
+        meta["industry"] = info.get("industry")
+        meta["market_cap"] = info.get("marketCap")
+    except Exception:
+        pass
+    _meta_cache[ticker] = (now, meta)
+    return meta
+
+
+def _cap_label(mc):
+    if not mc:
+        return None
+    if mc >= 200e9:
+        return "Mega-cap"
+    if mc >= 10e9:
+        return "Large-cap"
+    if mc >= 2e9:
+        return "Mid-cap"
+    if mc >= 300e6:
+        return "Small-cap"
+    return "Micro-cap"
+
+
+def build_thesis(res, meta):
+    """One-line, data-driven rationale: what the name is + why it's on the list."""
+    head_bits = [b for b in (_cap_label(meta.get("market_cap")),
+                             meta.get("sector") or meta.get("industry")) if b]
+    head = (" ".join(head_bits) + " name") if head_bits else "Name"
+    why = _WHY.get(res.get("phase"), res.get("note", ""))
+    out = f"{head} {why}"
+    rs = res.get("rs_3m_vs_spy")
+    if rs is not None and rs > 0:
+        out += f"; +{rs * 100:.0f}% relative strength vs the market (3M)"
+    return out + "."
+
+
+def enrich(res):
+    """Attach company name / sector / industry / market cap / thesis to a result."""
+    t = res.get("ticker")
+    if not t:
+        return res
+    meta = get_meta(t)
+    res["name"] = meta.get("name")
+    res["sector"] = meta.get("sector")
+    res["industry"] = meta.get("industry")
+    res["market_cap"] = meta.get("market_cap")
+    res["thesis"] = build_thesis(res, meta)
+    return res
+
+
 # --- yfinance-backed fetch + cache -----------------------------------------
 _cache = {}          # ticker -> (timestamp, analysis dict)
 _bench_cache = {}    # symbol -> (timestamp, closes)
@@ -229,6 +305,7 @@ def analyze_tickers(tickers, benchmark="SPY", limit=25):
             else:
                 res = analyze_series(closes, volumes, bench)
                 res["ticker"] = t
+                enrich(res)
         except Exception as e:  # network/parse failure -> degrade gracefully
             res = {"ticker": t, "phase": "Error", "signal": "n/a",
                    "status": "gray", "note": str(e)[:120]}

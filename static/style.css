@@ -566,6 +566,14 @@ tbody tr:last-child td {
     gap: 6px;
 }
 
+.co-name {
+    font-weight: 400;
+    color: var(--text-muted);
+    font-size: 10px;
+    white-space: normal;
+    max-width: 160px;
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 1024px) {
     .grid-3 {
