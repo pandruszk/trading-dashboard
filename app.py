@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Trading Dashboard — Flask Backend
-===================================
-Serves a live web dashboard for the automated trading system.
+Kell Autopilot — Dashboard Backend (Flask)
+==========================================
+Serves the live web dashboard for the Kell Cycle autopilot trading system.
 
 Run locally:  python3 app.py
 Deploy:       railway up  (or push to GitHub + connect Railway)
@@ -33,20 +33,14 @@ import kell
 import kell_scan
 
 # ============================================================
-# CONFIG
+# CONFIG  (shared with the autopilot via broker.py)
 # ============================================================
-HOME = os.path.expanduser("~")
-KEYS_FILE = os.path.join(HOME, ".alpaca_keys")
-STATE_FILE = os.path.join(HOME, "Documents", "portfolio_state.json")
-SCHEDULE_FILE = os.path.join(HOME, "Documents", "trading_schedule.json")
-LOG_DIR = os.path.join(HOME, "Documents", "trading_logs")
-
-TRAILING_STOP_PCT = 0.20
-HARD_STOP_PCT = 0.25
-PROFIT_TAKE_PCT = 0.50
-MAX_SECTOR_WEIGHT = 0.45
-MAX_PER_SECTOR = 3
-INITIAL_CAPITAL = 100000  # Alpaca paper account starting equity
+from broker import (
+    STATE_FILE, SCHEDULE_FILE, LOG_DIR,
+    TRAILING_STOP_PCT, HARD_STOP_PCT, PROFIT_TAKE_PCT,
+    MAX_SECTOR_WEIGHT, MAX_PER_SECTOR, INITIAL_CAPITAL,
+    load_keys, get_api,
+)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
@@ -67,35 +61,6 @@ def login_required(f):
 # ============================================================
 # HELPERS
 # ============================================================
-def load_keys():
-    # Environment variables first (for deployment), then file
-    key_id = os.environ.get("APCA_API_KEY_ID")
-    secret = os.environ.get("APCA_API_SECRET_KEY")
-    base_url = os.environ.get("APCA_API_BASE_URL")
-
-    if key_id and secret and base_url:
-        return {"APCA_API_KEY_ID": key_id, "APCA_API_SECRET_KEY": secret, "APCA_API_BASE_URL": base_url}
-
-    keys = {}
-    with open(KEYS_FILE, "r") as f:
-        for line in f:
-            line = line.strip()
-            if "=" in line and not line.startswith("#"):
-                k, v = line.split("=", 1)
-                keys[k.strip()] = v.strip()
-    return keys
-
-
-def get_api():
-    keys = load_keys()
-    return tradeapi.REST(
-        key_id=keys["APCA_API_KEY_ID"],
-        secret_key=keys["APCA_API_SECRET_KEY"],
-        base_url=keys["APCA_API_BASE_URL"],
-        api_version="v2",
-    )
-
-
 def load_state():
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, "r") as f:
