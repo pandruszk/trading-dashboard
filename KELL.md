@@ -79,6 +79,29 @@ strength vs SPY over ~3 months (`rs_3m_vs_spy`) to favor leaders.
 - **Endpoint:** `GET /api/kell` — analyzes your current Alpaca holdings, plus any `?tickers=NVDA,AAPL` watchlist. Results are cached 15 minutes and ordered most-actionable-first (exits/trims → buys → holds).
 - **Dashboard:** a **Kell Cycle** card with a saved watchlist box, showing each name's phase, signal, extension from the 10/21 EMA and 50 SMA, 3-month relative strength, and the 21-EMA stop.
 
+## 3b. Whole-market screener ([`kell_scan.py`](kell_scan.py))
+
+The cycle classifier above *reads names you give it*. The screener does the
+**discovery** half of Kell's workflow — sweeping the market to find names
+*currently* setting up.
+
+- **Universe:** the full list of US-listed common stocks from the public
+  [NASDAQ Trader symbol file](https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqtraded.txt)
+  (ETFs / warrants / units / test issues filtered out; cached daily). Falls
+  back to a built-in large-cap list if that download is unavailable.
+- **Filter:** keeps names in a **buy phase** (EMA Crossback / Base & Break)
+  with **stacked MAs** and **positive 3-month relative strength vs SPY**, above
+  a price (`MIN_PRICE`) and dollar-volume (`MIN_DOLLAR_VOL`) floor so results
+  are tradeable. Ranked by relative strength, strongest first.
+- **Runs as a background job** — a full-market sweep hits thousands of tickers
+  and takes minutes, so it batch-downloads via yfinance on a worker thread,
+  writes results to `kell_scan.json`, and the dashboard polls progress.
+  - `POST /api/kell/scan/run[?max=N]` — start a scan (optionally cap the universe)
+  - `GET  /api/kell/scan` — latest cached results + live status
+  - `python3 kell_scan.py [N]` — run standalone (for a cron/launchd schedule)
+- **Dashboard:** a **Kell Screener — Whole Market** card with a *Rescan
+  market* button, live progress, and the ranked candidate list.
+
 ## 4. Possible next steps
 
 - Feed Kell signals into the **Alerts** panel (e.g., surface every `TRIM`/`EXIT`).
