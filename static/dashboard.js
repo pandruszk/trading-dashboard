@@ -715,7 +715,9 @@ function renderKellScan(data) {
         } else if (status.state === "error") {
             statusEl.textContent = "Scan error: " + (status.error || "unknown");
         } else if (data.generated) {
-            statusEl.textContent = `Scanned ${data.scanned || 0} of ${data.universe || 0} names`;
+            const wd = data.with_data != null ? ` (${data.with_data} with data)` : "";
+            statusEl.textContent =
+                `Scanned ${data.scanned || 0} of ${data.universe || 0}${wd} · ${(data.results || []).length} setups`;
         } else {
             statusEl.textContent = "No scan yet — click Rescan market (takes a few minutes).";
         }

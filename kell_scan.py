@@ -16,10 +16,12 @@ Can also be run standalone for a cron/launchd job:  python3 kell_scan.py
 import os
 import json
 import time
+import random
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.request import urlopen, Request
 
+import broker
 import kell
 
 # --- Where the scan results + cached symbol list live (both gitignored) -----
@@ -64,6 +66,7 @@ _scan_status = {
     "state": "idle",            # idle | running | done | error
     "stage": None,              # scanning | enriching (while running)
     "scanned": 0,
+    "with_data": 0,             # how many names actually returned price data
     "total": 0,
     "matches": 0,
     "started": None,
@@ -155,56 +158,135 @@ def _extract(data, ticker, single):
         return None, None
 
 
-def run_scan(max_tickers=None, batch_size=BATCH_SIZE):
-    """Scan the universe for Kell buy setups (blocking). Writes results to disk."""
-    import yfinance as yf
+def _bars_to_series(df, symbols):
+    """Turn an Alpaca bars DataFrame into {symbol: (closes, volumes)}.
+    Handles multi-index, 'symbol'-column, and single-symbol frame shapes."""
+    out = {}
+    if df is None or len(df) == 0:
+        return out
+    try:
+        import pandas as pd
+        multi = isinstance(df.index, pd.MultiIndex)
+    except Exception:
+        multi = False
+    if multi:
+        for sym in df.index.get_level_values(0).unique():
+            sub = df.xs(sym, level=0)
+            out[str(sym)] = ([c for c in sub["close"].tolist() if c == c],
+                             sub["volume"].tolist())
+    elif "symbol" in getattr(df, "columns", []):
+        for sym, sub in df.groupby("symbol"):
+            out[str(sym)] = ([c for c in sub["close"].tolist() if c == c],
+                             sub["volume"].tolist())
+    else:
+        sym = symbols[0] if isinstance(symbols, (list, tuple)) else symbols
+        out[str(sym)] = ([c for c in df["close"].tolist() if c == c],
+                         df["volume"].tolist())
+    return out
 
+
+def _alpaca_bars(api, symbols, start):
+    """Daily bars for many symbols from Alpaca (authenticated, reliable)."""
+    from alpaca_trade_api.rest import TimeFrame
+    bars = api.get_bars(symbols, TimeFrame.Day, start=start, feed="iex")
+    return _bars_to_series(bars.df, symbols)
+
+
+def _yf_batch(symbols):
+    """Fallback: daily bars for a batch from yfinance."""
+    import yfinance as yf
+    data = yf.download(symbols, period="1y", interval="1d", group_by="ticker",
+                       threads=True, progress=False, auto_adjust=True)
+    single = len(symbols) == 1
+    out = {}
+    for t in symbols:
+        closes, vols = _extract(data, t, single)
+        if closes:
+            out[t] = (closes, vols)
+    return out
+
+
+def _fetch_batch(api, symbols, start):
+    """{symbol: (closes, volumes)} for a batch — Alpaca first, yfinance fallback."""
+    if api is not None:
+        try:
+            res = _alpaca_bars(api, symbols, start)
+            if res:
+                return res
+        except Exception:
+            pass
+    try:
+        return _yf_batch(symbols)
+    except Exception:
+        return {}
+
+
+def _scan_bench(api, start):
+    """SPY closes for relative strength (Alpaca, falling back to yfinance)."""
+    if api is not None:
+        try:
+            closes = (_alpaca_bars(api, ["SPY"], start).get("SPY") or (None,))[0]
+            if closes:
+                return closes
+        except Exception:
+            pass
+    return kell._benchmark_closes("SPY")
+
+
+def run_scan(max_tickers=None, batch_size=BATCH_SIZE):
+    """Scan the universe for Kell buy setups (blocking); writes results to disk.
+
+    Pulls price data from Alpaca (reliable bulk bars) with a yfinance fallback,
+    and scans in RANDOM order so a partial/throttled run stays unbiased instead
+    of skewing to the start of the alphabet.
+    """
     with _scan_lock:
         if _scan_status["state"] == "running":
             return dict(_scan_status)
         _scan_status.update(state="running", stage="scanning", scanned=0, total=0,
-                            matches=0, started=datetime.now().isoformat(),
+                            matches=0, with_data=0, started=datetime.now().isoformat(),
                             finished=None, error=None)
 
     try:
+        try:
+            api = broker.get_api()
+        except Exception:
+            api = None
+
         universe = get_universe()
+        random.shuffle(universe)            # unbiased even if the run is cut short
         if max_tickers:
             universe = universe[:max_tickers]
         _scan_status["total"] = len(universe)
 
-        bench = kell._benchmark_closes("SPY")
+        start = (datetime.now() - timedelta(days=420)).strftime("%Y-%m-%d")
+        bench = _scan_bench(api, start)
         matches = []
 
         for i in range(0, len(universe), batch_size):
             batch = universe[i:i + batch_size]
-            try:
-                data = yf.download(batch, period="1y", interval="1d",
-                                   group_by="ticker", threads=True,
-                                   progress=False, auto_adjust=True)
-            except Exception:
-                data = None
-
-            single = len(batch) == 1
+            series = _fetch_batch(api, batch, start)
             for t in batch:
-                if data is not None:
-                    closes, volumes = _extract(data, t, single)
-                    if closes and len(closes) >= 50:
-                        try:
-                            res = kell.analyze_series(closes, volumes, bench)
-                            res["ticker"] = t
-                            price = res.get("price") or 0
-                            avgvol = (sum(volumes[-50:]) / 50.0
-                                      if volumes and len(volumes) >= 50 else 0)
-                            res["dollar_vol"] = round(price * avgvol)
-                            if (price >= MIN_PRICE
-                                    and res["dollar_vol"] >= MIN_DOLLAR_VOL
-                                    and _is_candidate(res)):
-                                matches.append(res)
-                        except Exception:
-                            pass
+                cv = series.get(t)
+                if cv and cv[0] and len(cv[0]) >= 50:
+                    _scan_status["with_data"] += 1
+                    closes, volumes = cv
+                    try:
+                        res = kell.analyze_series(closes, volumes, bench)
+                        res["ticker"] = t
+                        price = res.get("price") or 0
+                        avgvol = (sum(volumes[-50:]) / 50.0
+                                  if volumes and len(volumes) >= 50 else 0)
+                        res["dollar_vol"] = round(price * avgvol)
+                        if (price >= MIN_PRICE
+                                and res["dollar_vol"] >= MIN_DOLLAR_VOL
+                                and _is_candidate(res)):
+                            matches.append(res)
+                    except Exception:
+                        pass
                 _scan_status["scanned"] += 1
             _scan_status["matches"] = len(matches)
-            time.sleep(0.3)   # be polite to the data source between batches
+            time.sleep(0.2)   # gentle pacing between batches
 
         matches.sort(key=lambda r: r.get("rs_3m_vs_spy") or 0, reverse=True)
         matches = matches[:MAX_RESULTS]
@@ -217,6 +299,7 @@ def run_scan(max_tickers=None, batch_size=BATCH_SIZE):
         payload = {
             "results": matches,
             "scanned": _scan_status["scanned"],
+            "with_data": _scan_status["with_data"],
             "universe": len(universe),
             "generated": datetime.now().isoformat(),
         }
